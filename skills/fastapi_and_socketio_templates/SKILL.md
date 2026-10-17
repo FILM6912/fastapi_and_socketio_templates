@@ -3,9 +3,10 @@ name: fastapi_and_socketio_templates
 description: >-
   Scaffold a FastAPI plus Socket.IO backend in the line-app layout: routers,
   schemas, services, repositories, hardware, and workers on one ASGI process,
-  with F-Docs at /docs. Use when the user asks for fastapi_and_socketio_templates,
-  a FastAPI and Socket.IO template, F-Docs, f-docs, or a station/line backend
-  shaped like the Celestica app.
+  with F-Docs at /docs. PLC access uses Mitsubishi MC Protocol (3E frame).
+  Use when the user asks for fastapi_and_socketio_templates, a FastAPI and
+  Socket.IO template, F-Docs, f-docs, an MC Protocol PLC client, or a
+  station/line backend shaped like the Celestica app.
 ---
 
 # FastAPI and Socket.IO Templates
@@ -38,7 +39,8 @@ app/
 ├── services/               # business rules
 │   ├── errors.py           # BusinessError and error_code to HTTP status
 │   └── repositories/       # table access only
-├── hardware/               # device clients (PLC, scanner, RFID)
+├── hardware/               # device clients (PLC via MC Protocol, scanner, RFID)
+│   └── plc.py              # pymcprotocol Type3E, one socket, one queue
 ├── workers/                # long-running loops started from lifespan
 ├── socketio/               # AsyncServer, namespaces, emitters, rooms
 ├── dependencies/           # auth and other request guards
@@ -65,6 +67,7 @@ router = APIRouter(prefix="/api/v1/stations", tags=["stations"])
 7. Mount Socket.IO around FastAPI. Mount static files and a SPA last, so `/api`, `/health`, `/docs`, and `/socket.io` win.
 8. Settings come from environment variables through `config.py`. No secrets in code.
 9. `/docs` is F-Docs by default. `DOCS_UI=swagger` is the only switch that restores builtin Swagger. Mount docs before the SPA.
+10. A PLC speaks Mitsubishi MC Protocol, 3E frame, through `pymcprotocol.Type3E`. Do not use Modbus for that PLC.
 
 ## Response envelope
 
@@ -205,6 +208,31 @@ async def _start_service(name: str, start) -> bool:
 
 Shutdown order is the reverse of startup. Close device connections before cancelling tasks.
 
+## PLC (MC Protocol)
+
+Put the client in `hardware/plc.py`. Depend on `pymcprotocol`. One PLC endpoint gets one `Type3E` client. A second PLC gets a second client, not a second socket on the first.
+
+Settings in `config.py`:
+
+| Env | Role |
+|-----|------|
+| `PLC_HOST` | PLC or plc-mock hostname |
+| `PLC_PORT` | MC port. A Q/L series CPU is often `5000`. A mock may use `502`. |
+| `PLC_TEST_MODE` | Skip the socket and serve an in-memory device |
+| `PLC_MOCK_ON_UNREACHABLE` | On connect failure, fall into that in-memory device and log it. Otherwise raise |
+
+Connect with `Type3E().connect(host, port)`. Then set `SO_LINGER` to on with timeout `0` so close sends RST. A Mitsubishi CPU keeps one MC client. A normal FIN can leave that slot busy.
+
+`pymcprotocol` is synchronous. All reads and writes go through one `asyncio` queue and one worker. Run each command with `asyncio.to_thread`. A router, a service, and a Socket.IO callback must not touch the socket.
+
+Words use `batchread_wordunits(address, count)` and `batchwrite_wordunits(address, values)`. Bits use `batchread_bitunits`. Before a word write, mask each value with `0xFFFF`. If the result is `>= 0x8000`, store `word - 0x10000`. `batchwrite_wordunits` encodes a signed 16-bit range, `-32768..32767`.
+
+A health check writes a heartbeat word that toggles `0` and `1`. A read does not prove the CPU accepted a command.
+
+The address map (which D or M word means what) lives in config or a repository. `hardware/plc.py` reads and writes the addresses it is given. Do not hardcode a previous product's register list.
+
+In Compose, add a `plc-mock` service that answers MC Protocol on the port `PLC_PORT` uses. Set `PLC_HOST` to that service name on the compose network. Publish the mock port only when a tool on the host must reach it.
+
 ## Docker Compose
 
 One `server` service runs `uvicorn app.main:app`. Give it `env_file: .env`. Add Redis when the app caches or shares pub/sub. Add a mock service per device the hardware layer can run without the real machine.
@@ -222,6 +250,7 @@ Publish the API port. Do not publish Redis. Pass `REDIS_URL` as `redis://:${REDI
 - [ ] Socket event in `socketio/namespaces.py` only if a client must push or receive live data
 - [ ] Worker in `workers/` only if the work continues while no request is in flight
 - [ ] Hardware client in `hardware/` only if a device protocol is involved
+- [ ] `hardware/plc.py` using `Type3E` when a PLC is in scope, plus a `plc-mock` MC server in Compose
 
 ## Do not add
 
@@ -232,3 +261,5 @@ Publish the API port. Do not publish Redis. Pass `REDIS_URL` as `redis://:${REDI
 - A SPA mount that is registered before the API routers or before `/docs`
 - Swagger and F-Docs both registered on `/docs`
 - A docs bundle fetched from the network at request time
+- A Modbus client for a PLC that speaks MC Protocol
+- A second socket to the same PLC beside the command queue
