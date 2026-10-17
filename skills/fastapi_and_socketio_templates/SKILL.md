@@ -171,7 +171,9 @@ Put namespaces in `socketio/namespaces.py`, one `AsyncNamespace` class each. Reg
 | `/daemon` | device daemon | telemetry and command acks |
 | `/admin` | admin screen | override commands |
 
-Room names live in `socketio/rooms.py`. Server-to-client events go through one emitter so the envelope stays `{ command_id, station_id, side, payload, timestamp }`.
+Room names live in `socketio/rooms.py`. Server-to-client events go through one emitter so the envelope stays `{ command_id, station_id, side, payload, timestamp }`. A live device snapshot may use its own event name. Emit it from the socket layer, not from a router.
+
+Realtime is any value the screen must keep current: live words, status, telemetry, alarms. That path is Socket.IO. The page loads its layout with one REST call, then changes arrive as an event. The browser does not `setInterval` a GET. The server reads the device through the existing queue only while a client is subscribed, and emits again only when the payload changes. A button that reads or writes once stays REST.
 
 ## Service and repository
 
@@ -294,7 +296,7 @@ Publish the API port. Do not publish Redis. Pass `REDIS_URL` as `redis://:${REDI
 - [ ] `routers/<area>.py` with `APIRouter(prefix="/api/v1/<area>", tags=["<area>"])`
 - [ ] `include_router` in `main.py` for that area router, not a catch-all on `/`
 - [ ] An example in `openapi/examples.py` when the derived example would be wrong
-- [ ] Socket event on `/`, `/ui`, `/daemon`, or `/admin` in `socketio/namespaces.py` only if a client must push or receive live data. Do not add it on the default namespace unless the dashboard is the client.
+- [ ] Live data uses a Socket.IO event on `/`, `/ui`, `/daemon`, or `/admin`. Do not poll a REST route for it. Do not add the event on the default namespace unless the dashboard is the client.
 - [ ] Worker in `workers/` only if the work continues while no request is in flight
 - [ ] Hardware client in `hardware/` only if a device protocol is involved
 - [ ] `hardware/plc.py` using `Type3E` when a PLC is in scope, plus a `plc-mock` MC server in Compose
@@ -317,6 +319,7 @@ Publish the API port. Do not publish Redis. Pass `REDIS_URL` as `redis://:${REDI
 - A plc-mock page that is only a raw register table, or that copies another product's stations, jog, or auto-run
 - A PLC dashboard mounted under `/api/v1`, or one that copies another product's stations, jog, or auto-run
 - A second socket to the same PLC beside the command queue
+- A page that polls REST, with `setInterval` or a timer, to keep a live value on screen
 - A `def` route that calls the database, the PLC, or HTTP
 - `time.sleep` or `requests` inside `async def`
 - A performance rewrite of a path that has not been profiled
