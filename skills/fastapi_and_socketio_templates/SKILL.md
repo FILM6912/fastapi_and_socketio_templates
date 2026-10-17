@@ -55,7 +55,7 @@ app/
 
 ## Rules
 
-1. One area, one router file. Declare the prefix on the router.
+1. One area, one router file. Declare the prefix on that router as `/api/v1/<area>`. Do not hang product JSON routes on the app root or on one shared default router. Pages, `/health`, and `/docs` stay unversioned.
 
 ```python
 router = APIRouter(prefix="/api/v1/stations", tags=["stations"])
@@ -66,7 +66,7 @@ router = APIRouter(prefix="/api/v1/stations", tags=["stations"])
 4. A repository reads and writes one table. It does not decide workflow.
 5. A hardware module speaks one device. A worker loops. Both start in `lifespan` and shut down in the same function.
 6. A Socket.IO handler parses the event, calls a service, and returns an ack. Emit through `socketio/emitters.py`, not from a router.
-7. Mount Socket.IO around FastAPI. Mount static files and a SPA last, so `/api`, `/health`, `/docs`, and `/socket.io` win.
+7. Mount Socket.IO around FastAPI. Mount static files and a SPA last, so `/api/v1`, `/health`, `/docs`, and `/socket.io` win.
 8. Settings come from environment variables through `config.py`. No secrets in code.
 9. `/docs` is F-Docs by default. `DOCS_UI=swagger` is the only switch that restores builtin Swagger. Mount docs before the SPA.
 10. A PLC speaks Mitsubishi MC Protocol, 3E frame, through `pymcprotocol.Type3E`. Do not use Modbus for that PLC.
@@ -162,7 +162,7 @@ def create_asgi_app(fastapi_app):
     return socketio.ASGIApp(sio, other_asgi_app=fastapi_app, socketio_path="/socket.io")
 ```
 
-Put namespaces in `socketio/namespaces.py`. Typical split:
+Put namespaces in `socketio/namespaces.py`, one `AsyncNamespace` class each. Register all four. The default namespace is only the dashboard. Do not put operator, daemon, or admin events on `/`.
 
 | Namespace | Who connects | What it does |
 |-----------|----------------|--------------|
@@ -285,10 +285,10 @@ Publish the API port. Do not publish Redis. Pass `REDIS_URL` as `redis://:${REDI
 - [ ] `schemas/<area>.py` for the body and the response data
 - [ ] `services/<area>_service.py` for the rules
 - [ ] `services/repositories/<area>_repo.py` when a table is involved
-- [ ] `routers/<area>.py` with `APIRouter(prefix="/api/v1/<area>")`
-- [ ] `include_router` in `main.py`
+- [ ] `routers/<area>.py` with `APIRouter(prefix="/api/v1/<area>", tags=["<area>"])`
+- [ ] `include_router` in `main.py` for that area router, not a catch-all on `/`
 - [ ] An example in `openapi/examples.py` when the derived example would be wrong
-- [ ] Socket event in `socketio/namespaces.py` only if a client must push or receive live data
+- [ ] Socket event on `/`, `/ui`, `/daemon`, or `/admin` in `socketio/namespaces.py` only if a client must push or receive live data. Do not add it on the default namespace unless the dashboard is the client.
 - [ ] Worker in `workers/` only if the work continues while no request is in flight
 - [ ] Hardware client in `hardware/` only if a device protocol is involved
 - [ ] `hardware/plc.py` using `Type3E` when a PLC is in scope, plus a `plc-mock` MC server in Compose
@@ -296,6 +296,8 @@ Publish the API port. Do not publish Redis. Pass `REDIS_URL` as `redis://:${REDI
 ## Do not add
 
 - A second public URL prefix for the same endpoint
+- Product JSON routes outside `/api/v1/<area>`, or every area piled onto one default router
+- Operator, daemon, or admin events on the default Socket.IO namespace
 - Business branches inside the Socket.IO callback
 - Direct table calls from a router
 - Secrets, host PLC addresses, or customer URLs in the template
