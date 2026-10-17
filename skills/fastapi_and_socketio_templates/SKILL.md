@@ -274,6 +274,8 @@ The address map (which D or M word means what) lives in config or a repository. 
 
 In Compose, add a `plc-mock` service that answers MC Protocol on the port `PLC_PORT` uses. Set `PLC_HOST` to that service name on the compose network. Publish the mock port only when a tool on the host must reach it.
 
+The mock also serves a controller page. Use the glass dashboard shell: a sticky header, a heartbeat reading, a connection badge, and one tab per sheet in the address workbook. Machine-status words are metric cards. Repeated sections such as slots and a data stack are cards in a grid. Values on the page follow the mock memory. Build the cards from that workbook. Do not copy another line's station names, jog controls, auto-run, or tower lamps onto this page.
+
 ## Docker Compose
 
 One `server` service runs `uvicorn app.main:app`. Give it `env_file: .env`. Add Redis when the app caches or shares pub/sub. Add a mock service per device the hardware layer can run without the real machine.
@@ -292,6 +294,7 @@ Publish the API port. Do not publish Redis. Pass `REDIS_URL` as `redis://:${REDI
 - [ ] Worker in `workers/` only if the work continues while no request is in flight
 - [ ] Hardware client in `hardware/` only if a device protocol is involved
 - [ ] `hardware/plc.py` using `Type3E` when a PLC is in scope, plus a `plc-mock` MC server in Compose
+- [ ] `plc-mock` controller page: glass header, heartbeat, one tab per address-book sheet, no borrowed station grid
 
 ## Do not add
 
@@ -305,6 +308,7 @@ Publish the API port. Do not publish Redis. Pass `REDIS_URL` as `redis://:${REDI
 - Swagger and F-Docs both registered on `/docs`
 - A docs bundle fetched from the network at request time
 - A Modbus client for a PLC that speaks MC Protocol
+- A plc-mock page that is only a raw register table, or that copies another product's stations, jog, or auto-run
 - A second socket to the same PLC beside the command queue
 - A `def` route that calls the database, the PLC, or HTTP
 - `time.sleep` or `requests` inside `async def`
