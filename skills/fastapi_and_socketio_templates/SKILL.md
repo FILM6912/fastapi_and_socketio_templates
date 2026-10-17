@@ -278,6 +278,8 @@ The mock also serves a controller page. Use the glass dashboard shell: a sticky 
 
 Above the sheet tabs, add a manual read/write card. The operator enters a D address (digits alone gain a D prefix), a count from 1 to 100, and write values separated by commas or spaces. A value may be decimal or `0x` hex. Read shows the words in decimal and as 16-bit hex. Write stores that span in the mock memory, including a D address that is not in the workbook. The station client still refuses a write that is outside the workbook.
 
+The station app serves that same glass dashboard at `/plc-dashboard`, outside `/api/v1`. The page loads `GET /api/v1/plc/map` and polls `GET /api/v1/plc/snapshot`. The snapshot batch-reads the workbook addresses through the one PLC queue, in contiguous spans of at most 64 words. Manual read on that page may ask for any D address through `GET /api/v1/plc/read`. Manual write still goes through `POST /api/v1/plc/write` and is refused when the address is outside the workbook. Do not mount this page on a path that shadows `/api/v1`, and do not open a second socket to poll it.
+
 ## Docker Compose
 
 One `server` service runs `uvicorn app.main:app`. Give it `env_file: .env`. Add Redis when the app caches or shares pub/sub. Add a mock service per device the hardware layer can run without the real machine.
@@ -298,6 +300,7 @@ Publish the API port. Do not publish Redis. Pass `REDIS_URL` as `redis://:${REDI
 - [ ] `hardware/plc.py` using `Type3E` when a PLC is in scope, plus a `plc-mock` MC server in Compose
 - [ ] `plc-mock` controller page: glass header, heartbeat, one tab per address-book sheet, no borrowed station grid
 - [ ] Manual read/write card: D address, count, comma-separated values, decimal and hex result
+- [ ] App page `/plc-dashboard`: same glass shell, fed by `/api/v1/plc/map` and `/api/v1/plc/snapshot`, no borrowed station grid
 
 ## Do not add
 
@@ -312,6 +315,7 @@ Publish the API port. Do not publish Redis. Pass `REDIS_URL` as `redis://:${REDI
 - A docs bundle fetched from the network at request time
 - A Modbus client for a PLC that speaks MC Protocol
 - A plc-mock page that is only a raw register table, or that copies another product's stations, jog, or auto-run
+- A PLC dashboard mounted under `/api/v1`, or one that copies another product's stations, jog, or auto-run
 - A second socket to the same PLC beside the command queue
 - A `def` route that calls the database, the PLC, or HTTP
 - `time.sleep` or `requests` inside `async def`
