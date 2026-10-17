@@ -276,6 +276,8 @@ In Compose, add a `plc-mock` service that answers MC Protocol on the port `PLC_P
 
 The mock also serves a controller page. Use the glass dashboard shell: a sticky header, a heartbeat reading, a connection badge, and one tab per sheet in the address workbook. Machine-status words are metric cards. Repeated sections such as slots and a data stack are cards in a grid. Values on the page follow the mock memory. Build the cards from that workbook. Do not copy another line's station names, jog controls, auto-run, or tower lamps onto this page.
 
+Above the sheet tabs, add a manual read/write card. The operator enters a D address (digits alone gain a D prefix), a count from 1 to 100, and write values separated by commas or spaces. A value may be decimal or `0x` hex. Read shows the words in decimal and as 16-bit hex. Write stores that span in the mock memory, including a D address that is not in the workbook. The station client still refuses a write that is outside the workbook.
+
 ## Docker Compose
 
 One `server` service runs `uvicorn app.main:app`. Give it `env_file: .env`. Add Redis when the app caches or shares pub/sub. Add a mock service per device the hardware layer can run without the real machine.
@@ -295,6 +297,7 @@ Publish the API port. Do not publish Redis. Pass `REDIS_URL` as `redis://:${REDI
 - [ ] Hardware client in `hardware/` only if a device protocol is involved
 - [ ] `hardware/plc.py` using `Type3E` when a PLC is in scope, plus a `plc-mock` MC server in Compose
 - [ ] `plc-mock` controller page: glass header, heartbeat, one tab per address-book sheet, no borrowed station grid
+- [ ] Manual read/write card: D address, count, comma-separated values, decimal and hex result
 
 ## Do not add
 
