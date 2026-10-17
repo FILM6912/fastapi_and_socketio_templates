@@ -1,5 +1,5 @@
 ---
-name: fastapi-and-socketio-templates
+name: fastapi_and_socketio_templates
 description: >-
   Scaffold a FastAPI plus Socket.IO backend in the line-app layout: routers,
   schemas, services, repositories, hardware, and workers on one ASGI process,
